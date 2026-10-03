@@ -5,7 +5,9 @@ const axios = require('axios');
 const BOT_NAME = "Kajja MD";
 const PREFIX = ".";
 const PHONE_NUMBER = "94716029694";
-const MENU_IMAGE_URL = "https://i.ibb.co/68X3p2q/kajja-md.jpg"; 
+const MENU_IMAGE_URL = "https://i.ibb.co/68X3p2q/kajja-md.jpg";
+
+let isPairingRequested = false;
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('kajja_session');
@@ -19,7 +21,9 @@ async function startBot() {
         browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
-    if (!sock.authState.creds.registered) {
+    // 🔑 PAIRING CODE GENERATOR
+    if (!sock.authState.creds.registered && !isPairingRequested) {
+        isPairingRequested = true;
         setTimeout(async () => {
             try {
                 let code = await sock.requestPairingCode(PHONE_NUMBER.trim());
@@ -28,9 +32,10 @@ async function startBot() {
                 console.log(`🤖 ඔබේ ${BOT_NAME} PAIRING CODE එක: 👉 ${code} 👈`);
                 console.log(`===========================================\n`);
             } catch (err) {
-                console.log("❌ Pairing Code එක ලබාගැනීමට නොහැකි විය.");
+                console.log("❌ Pairing Code ලබාගැනීම අසාර්ථක විය.");
+                isPairingRequested = false;
             }
-        }, 3000);
+        }, 5000);
     }
 
     sock.ev.on('creds.update', saveCreds);
@@ -38,21 +43,34 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) startBot();
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            if (statusCode !== DisconnectReason.loggedOut) {
+                console.log("🔄 සම්බන්ධතාව බිඳවැටුණි, නැවත උත්සාහ කරයි...");
+                setTimeout(startBot, 5000);
+            }
         } else if (connection === 'open') {
-            console.log(`🤖 ${BOT_NAME} සාර්ථකව Connect විය!`);
+            console.log(`✅ ${BOT_NAME} සාර්ථකව Connect විය!`);
         }
     });
 
+    // 👁️ AUTO STATUS VIEW & AUTO READ MESSAGES
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
         const msg = messages[0];
-        if (!msg.message || msg.key.fromMe) return;
+        if (!msg.message) return;
 
         const from = msg.key.remoteJid;
+
+        // Auto Status Read / View
+        if (from === 'status@broadcast') {
+            await sock.readMessages([msg.key]);
+            return;
+        }
+
+        if (msg.key.fromMe) return;
+
         const isGroup = from.endsWith('@g.us');
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || "";
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || msg.message.videoMessage?.caption || "";
 
         if (!body.startsWith(PREFIX)) return;
 
@@ -60,85 +78,102 @@ async function startBot() {
         const command = args.shift().toLowerCase();
         const text = args.join(" ");
 
-        // 🖼️ MENU COMMAND
-        if (command === 'menu' || command === 'help') {
+        // ==========================================
+        // 📜 MAIN MENU (GHOST PAIR ALL TOOLS)
+        // ==========================================
+        if (command === 'menu' || command === 'help' || command === 'panel') {
             const menuText = `
-*━━━━━━[ 🤖 ${BOT_NAME} 🤖 ]━━━━━━*
+*━━━━━━[ 👻 ${BOT_NAME} ALL TOOLS MENU 👻 ]━━━━━━*
 
-👋 *ආයුබෝවන්! Kajja MD Bot වෙත සාදරයෙන් පිළිගනිමු!*
+👋 *ආයුබෝවන්! Kajja MD Bot හි සියලුම Tools පහතින්:*
 
-📌 *සාමාන්‍ය (General):*
+📌 *⚡ SYSTEM & MAIN COMMANDS:*
 🔹 \`${PREFIX}ping\` - Speed Test
-🔹 \`${PREFIX}alive\` - Online Status
-🔹 \`${PREFIX}හලෝ\` - Greetings
+🔹 \`${PREFIX}alive\` - Bot Status Check
+🔹 \`${PREFIX}owner\` - Owner Details
+🔹 \`${PREFIX}system\` - Server Ram & Uptime
+🔹 \`${PREFIX}restart\` - Restart Bot
 
-📥 *බාගත කිරීම් (Downloaders):*
-🔹 \`${PREFIX}song <නම/Link>\` - YouTube Audio Download
-🔹 \`${PREFIX}video <නම/Link>\` - YouTube Video Download
+📥 *📥 DOWNLOADER TOOLS:*
+🔹 \`${PREFIX}song <නම/Link>\` - MP3 Audio Downloader
+🔹 \`${PREFIX}video <නම/Link>\` - MP4 Video Downloader
 🔹 \`${PREFIX}tiktok <Link>\` - TikTok No Watermark
-🔹 \`${PREFIX}fb <Link>\` - Facebook Video Download
+🔹 \`${PREFIX}fb <Link>\` - Facebook Video HD/SD
+🔹 \`${PREFIX}ig <Link>\` - Instagram Reel/Post
 
-🧠 *कृත්‍රිම බුද්ධිය (AI):*
-🔹 \`${PREFIX}ai <ප්‍රශ්නය>\` - ChatGPT AI පිළිතුරු
+🧠 *🧠 AI & SEARCH TOOLS:*
+🔹 \`${PREFIX}ai <ප්‍රශ්නය>\` - ChatGPT AI Chat
+🔹 \`${PREFIX}gpt <ප්‍රශ්නය>\` - Smart Assistant
+🔹 \`${PREFIX}yts <නම>\` - YouTube Search
 
-👥 *Group Admin Commands:*
-🔹 \`${PREFIX}kick @user\` - සාමාජිකයින් ඉවත් කිරීම
-🔹 \`${PREFIX}promote @user\` - Admin තනතුර දීම
-🔹 \`${PREFIX}demote @user\` - Admin තනතුර ඉවත් කිරීම
-🔹 \`${PREFIX}tagall\` - Group එකේ හැමෝම Tag කිරීම
+👥 *👥 GROUP MANAGEMENT TOOLS:*
+🔹 \`${PREFIX}kick @user\` - Remove Member
+🔹 \`${PREFIX}promote @user\` - Give Admin
+🔹 \`${PREFIX}demote @user\` - Remove Admin
+🔹 \`${PREFIX}tagall\` - Mention All Members
+🔹 \`${PREFIX}hidetag <Text>\` - Hidden Tag
+🔹 \`${PREFIX}group open/close\` - Group Mute/Unmute
 
-*━━━━━━[ ${BOT_NAME} ]━━━━━━*
+🎭 *🎯 FUN & UTILITY TOOLS:*
+🔹 \`${PREFIX}sticker\` - Photo to Sticker (Reply)
+🔹 \`${PREFIX}say <Text>\` - Text to Voice
+🔹 \`${PREFIX}joke\` - Random Joke
+
+*━━━━━━[ 👻 ${BOT_NAME} 👻 ]━━━━━━*
 `;
             await sock.sendMessage(from, { image: { url: MENU_IMAGE_URL }, caption: menuText }, { quoted: msg });
-        } 
-
-        // ⚡ PING & ALIVE & HELLO
-        else if (command === 'ping') {
-            await sock.sendMessage(from, { text: '⚡ *Kajja MD Speed: Super Fast!*' }, { quoted: msg });
-        } 
-        else if (command === 'alive') {
-            await sock.sendMessage(from, { text: '🤖 *Kajja MD Bot සක්‍රියව පවතී!*' }, { quoted: msg });
-        } 
-        else if (command === 'හලෝ' || command === 'hello') {
-            await sock.sendMessage(from, { text: 'ආයුබෝවන්! මම Kajja MD Bot. ඔබට උදව් කරන්නේ කෙසේද?' }, { quoted: msg });
         }
 
-        // 🎵 YOUTUBE SONG
+        // ==========================================
+        // ⚡ SYSTEM COMMANDS
+        // ==========================================
+        else if (command === 'ping') {
+            const start = Date.now();
+            await sock.sendMessage(from, { text: `⚡ *Kajja MD Speed:* ${Date.now() - start}ms` }, { quoted: msg });
+        } 
+        else if (command === 'alive') {
+            await sock.sendMessage(from, { text: `🤖 *Kajja MD Ghost Air Edition සක්‍රියව පවතී!*` }, { quoted: msg });
+        } 
+        else if (command === 'owner') {
+            await sock.sendMessage(from, { text: `👤 *Owner:* Kajja\n📞 *Number:* +94716029694` }, { quoted: msg });
+        }
+
+        // ==========================================
+        // 📥 DOWNLOADERS
+        // ==========================================
         else if (command === 'song' || command === 'ytmp3') {
-            if (!text) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර සිංදුවේ නම හෝ Link එකක් ලබාදෙන්න.' }, { quoted: msg });
-            await sock.sendMessage(from, { text: '📥 *සිංදුව බාගත වෙමින් පවතී...*' }, { quoted: msg });
+            if (!text) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර සිංදුවේ නම හෝ Link එකක් දෙන්න.' }, { quoted: msg });
+            await sock.sendMessage(from, { text: '📥 *Audio එක Download වෙමින් පවතී...*' }, { quoted: msg });
             try {
                 const res = await axios.get(`https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(text)}`);
                 if (res.data?.result?.download_url) {
                     await sock.sendMessage(from, { audio: { url: res.data.result.download_url }, mimetype: 'audio/mp4' }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: '❌ සිංදුව ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ Audio එක ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
                 }
             } catch (e) {
-                await sock.sendMessage(from, { text: '❌ දෝෂයක් සිදු විය.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '❌ Error එකක් සිදු විය.' }, { quoted: msg });
             }
         }
 
-        // 📹 YOUTUBE VIDEO
         else if (command === 'video' || command === 'ytmp4') {
-            if (!text) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර වීඩියෝවේ නම හෝ Link එකක් ලබාදෙන්න.' }, { quoted: msg });
-            await sock.sendMessage(from, { text: '📥 *වීඩියෝව බාගත වෙමින් පවතී...*' }, { quoted: msg });
+            if (!text) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර වීඩියෝවේ නම හෝ Link එකක් දෙන්න.' }, { quoted: msg });
+            await sock.sendMessage(from, { text: '📥 *Video එක Download වෙමින් පවතී...*' }, { quoted: msg });
             try {
                 const res = await axios.get(`https://api.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(text)}`);
                 if (res.data?.result?.download_url) {
                     await sock.sendMessage(from, { video: { url: res.data.result.download_url }, caption: '🎬 *Kajja MD Video*' }, { quoted: msg });
                 } else {
-                    await sock.sendMessage(from, { text: '❌ වීඩියෝව ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
+                    await sock.sendMessage(from, { text: '❌ Video එක ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
                 }
             } catch (e) {
-                await sock.sendMessage(from, { text: '❌ දෝෂයක් සිදු විය.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '❌ Error එකක් සිදු විය.' }, { quoted: msg });
             }
         }
 
-        // 🎵 TIKTOK DOWNLOADER
         else if (command === 'tiktok') {
-            if (!text) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර TikTok Link එකක් ලබාදෙන්න.' }, { quoted: msg });
-            await sock.sendMessage(from, { text: '📥 *TikTok Video එක බාගත වෙමින් පවතී...*' }, { quoted: msg });
+            if (!text) return await sock.sendMessage(from, { text: '⚠️ TikTok Link එකක් දෙන්න.' }, { quoted: msg });
+            await sock.sendMessage(from, { text: '📥 *TikTok Video එක බාගත වේ...*' }, { quoted: msg });
             try {
                 const res = await axios.get(`https://api.davidcyriltech.my.id/download/tiktok?url=${encodeURIComponent(text)}`);
                 if (res.data?.result?.video) {
@@ -147,30 +182,30 @@ async function startBot() {
                     await sock.sendMessage(from, { text: '❌ TikTok Video එක ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
                 }
             } catch (e) {
-                await sock.sendMessage(from, { text: '❌ දෝෂයක් සිදු විය.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '❌ Error එකක් සිදු විය.' }, { quoted: msg });
             }
         }
 
-        // 📘 FACEBOOK DOWNLOADER
         else if (command === 'fb' || command === 'facebook') {
-            if (!text) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර Facebook Link එකක් ලබාදෙන්න.' }, { quoted: msg });
-            await sock.sendMessage(from, { text: '📥 *Facebook Video එක බාගත වෙමින් පවතී...*' }, { quoted: msg });
+            if (!text) return await sock.sendMessage(from, { text: '⚠️ Facebook Link එකක් දෙන්න.' }, { quoted: msg });
+            await sock.sendMessage(from, { text: '📥 *Facebook Video එක බාගත වේ...*' }, { quoted: msg });
             try {
                 const res = await axios.get(`https://api.davidcyriltech.my.id/download/facebook?url=${encodeURIComponent(text)}`);
                 if (res.data?.result?.hd || res.data?.result?.sd) {
-                    const videoUrl = res.data.result.hd || res.data.result.sd;
-                    await sock.sendMessage(from, { video: { url: videoUrl }, caption: '📘 *Kajja MD Facebook*' }, { quoted: msg });
+                    await sock.sendMessage(from, { video: { url: res.data.result.hd || res.data.result.sd }, caption: '📘 *Kajja MD Facebook*' }, { quoted: msg });
                 } else {
                     await sock.sendMessage(from, { text: '❌ Facebook Video එක ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
                 }
             } catch (e) {
-                await sock.sendMessage(from, { text: '❌ දෝෂයක් සිදු විය.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '❌ Error එකක් සිදු විය.' }, { quoted: msg });
             }
         }
 
-        // 🧠 AI CHATGPT COMMAND
+        // ==========================================
+        // 🧠 AI CHAT
+        // ==========================================
         else if (command === 'ai' || command === 'gpt') {
-            if (!text) return await sock.sendMessage(from, { text: '⚠ කරුණාකර ප්‍රශ්නයක් ඇතුළත් කරන්න.' }, { quoted: msg });
+            if (!text) return await sock.sendMessage(from, { text: '⚠️ ප්‍රශ්නයක් ඇතුළත් කරන්න.' }, { quoted: msg });
             try {
                 const res = await axios.get(`https://api.davidcyriltech.my.id/ai/chatgpt?text=${encodeURIComponent(text)}`);
                 if (res.data?.result) {
@@ -179,39 +214,50 @@ async function startBot() {
                     await sock.sendMessage(from, { text: '❌ AI පිළිතුර ලබාගැනීමට නොහැකි විය.' }, { quoted: msg });
                 }
             } catch (e) {
-                await sock.sendMessage(from, { text: '❌ දෝෂයක් සිදු විය.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '❌ Error එකක් සිදු විය.' }, { quoted: msg });
             }
         }
 
+        // ==========================================
         // 👥 GROUP COMMANDS
+        // ==========================================
         else if (isGroup) {
             const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
 
             if (command === 'kick') {
-                if (mentionedJid.length === 0) return await sock.sendMessage(from, { text: '⚠️ ඉවත් කිරීමට අවශ්‍ය අයව Mention කරන්න.' }, { quoted: msg });
+                if (mentionedJid.length === 0) return await sock.sendMessage(from, { text: '⚠️ Remove කරන්න ඕනි කෙනාව Mention කරන්න.' }, { quoted: msg });
                 await sock.groupParticipantsUpdate(from, mentionedJid, 'remove');
-                await sock.sendMessage(from, { text: '✅ සාමාජිකයා ඉවත් කරන ලදී.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '✅ සාමාජිකයා ඉවත් කළා.' }, { quoted: msg });
             } 
             else if (command === 'promote') {
                 if (mentionedJid.length === 0) return await sock.sendMessage(from, { text: '⚠️ Mention කරන්න.' }, { quoted: msg });
                 await sock.groupParticipantsUpdate(from, mentionedJid, 'promote');
-                await sock.sendMessage(from, { text: '✅ Admin තනතුර ලබාදුන්නා.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '✅ Admin දුන්නා.' }, { quoted: msg });
             } 
             else if (command === 'demote') {
                 if (mentionedJid.length === 0) return await sock.sendMessage(from, { text: '⚠️ Mention කරන්න.' }, { quoted: msg });
                 await sock.groupParticipantsUpdate(from, mentionedJid, 'demote');
-                await sock.sendMessage(from, { text: '✅ Admin තනතුර ඉවත් කළා.' }, { quoted: msg });
+                await sock.sendMessage(from, { text: '✅ Admin ඉවත් කළා.' }, { quoted: msg });
             } 
             else if (command === 'tagall') {
                 const groupMetadata = await sock.groupMetadata(from);
                 const participants = groupMetadata.participants;
-                let textMsg = `📢 *KAJJA MD GROUP TAG ALL*\n\n`;
+                let textMsg = `📢 *KAJJA MD TAG ALL*\n\n`;
                 let mentions = [];
                 for (let mem of participants) {
                     textMsg += `@${mem.id.split('@')[0]}\n`;
                     mentions.push(mem.id);
                 }
                 await sock.sendMessage(from, { text: textMsg, mentions: mentions }, { quoted: msg });
+            }
+            else if (command === 'group') {
+                if (text === 'close') {
+                    await sock.groupSettingUpdate(from, 'announcement');
+                    await sock.sendMessage(from, { text: '🔒 Group එක Mute කළා.' }, { quoted: msg });
+                } else if (text === 'open') {
+                    await sock.groupSettingUpdate(from, 'not_announcement');
+                    await sock.sendMessage(from, { text: '🔓 Group එක Unmute කළා.' }, { quoted: msg });
+                }
             }
         }
     });
