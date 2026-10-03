@@ -1,7 +1,6 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, downloadContentFromMessage } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const axios = require('axios');
-const { Sticker, StickerTypes } = require('wa-sticker-format');
 
 const BOT_NAME = "Kajja MD";
 const PREFIX = ".";
@@ -66,7 +65,7 @@ async function startBot() {
             const menuText = `
 *━━━━━━[ 🤖 ${BOT_NAME} 🤖 ]━━━━━━*
 
-👋 *ආයුබෝවන්! Kajja MD Ghost Air Full Bot වෙත සාදරයෙන් පිළිගනිමු!*
+👋 *ආයුබෝවන්! Kajja MD Bot වෙත සාදරයෙන් පිළිගනිමු!*
 
 📌 *සාමාන්‍ය (General):*
 🔹 \`${PREFIX}ping\` - Speed Test
@@ -77,12 +76,9 @@ async function startBot() {
 🔹 \`${PREFIX}song <නම/Link>\` - YouTube Audio Download
 🔹 \`${PREFIX}video <නම/Link>\` - YouTube Video Download
 🔹 \`${PREFIX}tiktok <Link>\` - TikTok No Watermark
-🔹 \`${PREFIX}fb <Link>\` - Facebook HD/SD Video
+🔹 \`${PREFIX}fb <Link>\` - Facebook Video Download
 
-🎨 *වෙනත් (Tools):*
-🔹 \`${PREFIX}sticker\` - Photo to Sticker (Reply photo)
-
-🧠 *কৃත්‍රිම බුද්ධිය (AI):*
+🧠 *कृත්‍රිම බුද්ධිය (AI):*
 🔹 \`${PREFIX}ai <ප්‍රශ්නය>\` - ChatGPT AI පිළිතුරු
 
 👥 *Group Admin Commands:*
@@ -174,7 +170,7 @@ async function startBot() {
 
         // 🧠 AI CHATGPT COMMAND
         else if (command === 'ai' || command === 'gpt') {
-            if (!text) return await sock.sendMessage(from, { text: '⚠️️ කරුණාකර ප්‍රශ්නයක් ඇතුළත් කරන්න.' }, { quoted: msg });
+            if (!text) return await sock.sendMessage(from, { text: '⚠ කරුණාකර ප්‍රශ්නයක් ඇතුළත් කරන්න.' }, { quoted: msg });
             try {
                 const res = await axios.get(`https://api.davidcyriltech.my.id/ai/chatgpt?text=${encodeURIComponent(text)}`);
                 if (res.data?.result) {
@@ -184,34 +180,6 @@ async function startBot() {
                 }
             } catch (e) {
                 await sock.sendMessage(from, { text: '❌ දෝෂයක් සිදු විය.' }, { quoted: msg });
-            }
-        }
-
-        // 🎨 STICKER MAKER
-        else if (command === 'sticker' || command === 's') {
-            const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-            if (!isImage) return await sock.sendMessage(from, { text: '⚠️ කරුණාකර ඡායාරූපයකට Reply කර `.sticker` ලෙස යවන්න.' }, { quoted: msg });
-
-            await sock.sendMessage(from, { text: '🎨 *Sticker එක සාදමින් පවතී...*' }, { quoted: msg });
-            try {
-                let targetMsg = msg.message.imageMessage ? msg.message.imageMessage : msg.message.extendedTextMessage.contextInfo.quotedMessage.imageMessage;
-                const stream = await downloadContentFromMessage(targetMsg, 'image');
-                let buffer = Buffer.from([]);
-                for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-                let sticker = new Sticker(buffer, {
-                    pack: 'Kajja MD',
-                    author: 'Ghost Air',
-                    type: StickerTypes.FULL,
-                    categories: ['🤩', '🎉'],
-                    id: '12345',
-                    quality: 70
-                });
-
-                const stickerBuffer = await sticker.toBuffer();
-                await sock.sendMessage(from, { sticker: stickerBuffer }, { quoted: msg });
-            } catch (e) {
-                await sock.sendMessage(from, { text: '❌ Sticker එක සෑදීමට නොහැකි විය.' }, { quoted: msg });
             }
         }
 
