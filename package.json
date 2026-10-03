@@ -1,7 +1,7 @@
 {
   "name": "kajja-md",
-  "version": "1.0.0",
-  "description": "Kajja MD WhatsApp Bot",
+  "version": "2.0.0",
+  "description": "Kajja MD Full Featured WhatsApp Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
