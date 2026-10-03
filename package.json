@@ -1,7 +1,7 @@
 {
   "name": "kajja-md",
   "version": "1.0.0",
-  "description": "Kajja MD Sinhala WhatsApp Bot with Full Tools",
+  "description": "Kajja MD Sinhala WhatsApp Bot with Full Ghost Air Features",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -10,6 +10,8 @@
     "@whiskeysockets/baileys": "^6.6.0",
     "pino": "^8.19.0",
     "axios": "^1.6.8",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "wa-sticker-format": "^9.3.2"
   }
 }
