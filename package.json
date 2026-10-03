@@ -1,0 +1,13 @@
+{
+  "name": "kajja-md",
+  "version": "1.0.0",
+  "description": "Kajja MD Sinhala WhatsApp Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.6.0",
+    "pino": "^8.19.0"
+  }
+}
